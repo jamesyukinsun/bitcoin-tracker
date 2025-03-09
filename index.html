@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BITCOIN PRICE TRACKER $$$</title>
+    <meta name="description" content="Track Bitcoin's price in real-time with offline support">
+    <meta name="theme-color" content="#f7931a">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="bitcoin-logo.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <img src="bitcoin-logo.svg" alt="Bitcoin Logo" class="bitcoin-logo">
+                <h1>$$$ 老詹 BITCOIN $$$</h1>
+            </div>
+            <p class="subtitle">Track Bitcoin's price movement over the past 6 months</p>
+        </header>
+        
+        <div class="price-container">
+            <div class="current-price">
+                <h2>Current Price</h2>
+                <div id="current-price-value">Loading...</div>
+                <div id="price-change">
+                    <span id="price-change-value">0.00%</span>
+                    <span id="price-change-arrow">⟳</span>
+                </div>
+                <div id="last-updated">Last updated: --</div>
+            </div>
+            <div class="price-stats">
+                <div class="stat-box">
+                    <h3>24h High</h3>
+                    <p id="high-24h">Loading...</p>
+                </div>
+                <div class="stat-box">
+                    <h3>24h Low</h3>
+                    <p id="low-24h">Loading...</p>
+                </div>
+                <div class="stat-box">
+                    <h3>6m High</h3>
+                    <p id="high-6m">Loading...</p>
+                </div>
+                <div class="stat-box">
+                    <h3>6m Low</h3>
+                    <p id="low-6m">Loading...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Price History (6 Months)</h2>
+            <canvas id="price-chart"></canvas>
+        </div>
+        
+        <div class="data-table-container">
+            <h2>Historical Data</h2>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price (USD)</th>
+                        <th>24h Change</th>
+                        <th>Volume (USD)</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Data will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="app-install-container" id="app-install-container" style="display: none;">
+            <button id="install-button" class="install-button">Install App</button>
+        </div>
+        
+        <footer>
+            <p>Data provided by multiple cryptocurrency APIs with offline support</p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+        
+        // Handle app installation
+        let deferredPrompt;
+        const installContainer = document.getElementById('app-install-container');
+        const installButton = document.getElementById('install-button');
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
+            e.preventDefault();
+            // Stash the event so it can be triggered later
+            deferredPrompt = e;
+            // Show the install button
+            installContainer.style.display = 'block';
+        });
+        
+        installButton.addEventListener('click', () => {
+            // Hide the app install container
+            installContainer.style.display = 'none';
+            // Show the install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+    </script>
+</body>
+</html> 
