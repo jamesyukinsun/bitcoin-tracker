@@ -1,74 +1,92 @@
 # Bitcoin Price Tracker
 
-A simple, mobile-friendly website that tracks Bitcoin's price in real-time and displays its price history for the past 6 months.
+A modern, mobile-friendly Progressive Web App (PWA) that tracks Bitcoin's price in real-time and displays its price history for the past 6 months.
+
+![Bitcoin Tracker Screenshot](https://raw.githubusercontent.com/bitcoin/bitcoin/master/share/pixmaps/bitcoin128.png)
 
 ## Features
 
-- Real-time Bitcoin price updates (refreshes every 30 seconds)
-- 24-hour price change indicator
-- 24-hour high and low prices
-- 6-month price history chart with high and low indicators
-- Historical data table showing recent price movements
-- Mobile-responsive design
-- Bitcoin logo integration
-- Works in mainland China with multiple API fallbacks
-- Offline support with local data caching
+- **Real-time Bitcoin Price**: Displays the current BTC price in USD with 24-hour change percentage
+- **Historical Data**: Shows Bitcoin price history for the past 6 months in an interactive chart
+- **Price Statistics**: Displays 24-hour and 6-month high/low prices
+- **Weekly Price Table**: Lists Bitcoin prices by week for quick reference
+- **Offline Support**: Works without an internet connection using cached data
+- **Mobile-Friendly**: Responsive design works on all devices
+- **Installable**: Can be installed as a Progressive Web App on mobile and desktop
+- **Reliable Data**: Uses multiple reliable cryptocurrency APIs with fallbacks
+- **China Compatibility**: Special proxy and JSONP implementation for use in regions with internet restrictions
 
-## How to Use
+## API Sources
 
-1. Simply open the `index.html` file in any web browser
-2. The current Bitcoin price will be displayed at the top
-3. The 6-month price history chart will be displayed below
-4. Recent historical data is shown in a table format
+The app uses multiple reliable cryptocurrency APIs in the following order:
+
+1. **CoinGecko API** (Primary): One of the most reliable and comprehensive cryptocurrency data providers
+2. **Coinbase API** (First Fallback): Major US-based cryptocurrency exchange
+3. **Binance API** (Second Fallback): World's largest cryptocurrency exchange by trading volume
+4. **Kraken API** (Third Fallback): Established US-based cryptocurrency exchange
+
+If all APIs fail, the app falls back to cached data or hardcoded values to ensure it always displays something useful.
 
 ## Technical Details
 
-- No server required - this is a client-side only application
-- Multiple API providers with automatic fallbacks:
-  - Binance
-  - Huobi
-  - OKX
-  - ZB.com
-- JSONP approach for cross-origin requests
-- Local storage caching for offline support
-- Chart.js for data visualization
-- Responsive design for mobile devices
+### Technologies Used
 
-## API Information
+- **HTML5/CSS3**: For structure and styling
+- **JavaScript**: For data fetching, processing, and UI updates
+- **Chart.js**: For rendering the price history chart
+- **Service Worker**: For offline functionality
+- **LocalStorage**: For caching price data
+- **Web App Manifest**: For PWA installation capabilities
+- **JSONP & Proxy**: For accessing APIs in regions with internet restrictions
 
-This application tries multiple APIs in sequence until one works:
+### Data Refresh Rates
 
-1. Binance API:
-   - Current price: `https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT`
-   - Historical data: `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d`
+- Current price: Updates every 60 seconds
+- Historical data: Updates every 60 minutes
+- Cached data: Used when offline or when APIs are unavailable
 
-2. Huobi API:
-   - Current price: `https://api.huobi.pro/market/detail/merged?symbol=btcusdt`
-   - Historical data: `https://api.huobi.pro/market/history/kline?period=1day&size=180&symbol=btcusdt`
+## Installation
 
-3. OKX API:
-   - Current price: `https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT`
-   - Historical data: `https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1D&limit=180`
+### As a Progressive Web App
 
-4. ZB.com API:
-   - Current price: `https://api.zb.com/data/v1/ticker?market=btc_usdt`
-   - Historical data: `https://api.zb.com/data/v1/kline?market=btc_usdt&type=1day&size=180`
+1. Visit the app in a modern browser (Chrome, Edge, Safari, Firefox)
+2. On mobile: Tap the browser menu and select "Add to Home Screen"
+3. On desktop: Look for the install icon in the address bar
 
-If all APIs fail, the application falls back to hardcoded data to ensure something is always displayed.
+### As a Native App
 
-## Offline Support
+See the [APP_BUILD_INSTRUCTIONS.md](APP_BUILD_INSTRUCTIONS.md) file for detailed instructions on how to build the app as a native Android or iOS application using Capacitor.
 
-The application caches the most recent data in the browser's local storage:
-- Current price data is cached for 5 minutes
-- Historical data is cached for 24 hours
+## Development
 
-This allows the application to work even when offline or when APIs are temporarily unavailable.
+### Project Structure
+
+- `index.html`: Main HTML structure
+- `styles.css`: CSS styling
+- `script.js`: JavaScript functionality
+- `sw.js`: Service Worker for offline support
+- `manifest.json`: Web App Manifest for PWA features
+- `icons/`: App icons in various sizes
+- `bitcoin-logo.svg`: Bitcoin logo for display
+
+### Running Locally
+
+1. Clone the repository
+2. Open `index.html` in a browser
+3. For full PWA functionality, serve the files using a local web server
+
+### API Limitations
+
+- CoinGecko has a rate limit of 10-50 calls per minute
+- Some APIs may be blocked in certain regions
+- The app implements fallback mechanisms to handle API failures
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 
-- [Binance](https://www.binance.com/), [Huobi](https://www.huobi.com/), [OKX](https://www.okx.com/), and [ZB.com](https://www.zb.com/) for providing cryptocurrency APIs
-- [Chart.js](https://www.chartjs.org/) for the charting library
+- Bitcoin price data provided by CoinGecko, Coinbase, Binance, and Kraken
+- Bitcoin logo from the official Bitcoin repository
+- Chart.js for the interactive price chart
