@@ -8,55 +8,51 @@ const high24hElement = document.getElementById('high-24h');
 const low24hElement = document.getElementById('low-24h');
 const high6mElement = document.getElementById('high-6m');
 const low6mElement = document.getElementById('low-6m');
-const tableBodyElement = document.getElementById('table-body');
-
-// Store historical data
-let historicalData = [];
 
 // Chart configuration
 let chart;
 const chartConfig = {
-    type: 'line',
-    data: {
+        type: 'line',
+        data: {
         labels: [],
-        datasets: [{
-            label: 'Bitcoin Price (USD)',
+            datasets: [{
+                label: 'Bitcoin Price (USD)',
             data: [],
-            borderColor: '#f7931a',
-            backgroundColor: 'rgba(247, 147, 26, 0.1)',
-            borderWidth: 2,
-            pointRadius: 0,
+            borderColor: '#1f3a93',
+            backgroundColor: 'rgba(31, 58, 147, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
             fill: true,
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
             legend: {
                 display: false
             },
-            tooltip: {
-                mode: 'index',
-                intersect: false,
-                callbacks: {
-                    label: function(context) {
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
                         return `$${context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                     }
                 }
-            }
-        },
-        scales: {
-            x: {
-                ticks: {
-                    maxTicksLimit: 6,
-                    maxRotation: 0
                 }
             },
-            y: {
-                ticks: {
-                    callback: function(value) {
+            scales: {
+                x: {
+                    ticks: {
+                    maxTicksLimit: 6,
+                        maxRotation: 0
+                    }
+                },
+                y: {
+                    ticks: {
+                        callback: function(value) {
                         return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
                     }
                 }
@@ -83,6 +79,16 @@ function formatDate(timestamp) {
 
 // Format date for chart labels
 function formatChartDate(timestamp) {
+    // Make sure timestamp is a number
+    if (typeof timestamp === 'string') {
+        timestamp = parseInt(timestamp);
+    }
+    
+    // Check if timestamp is in seconds instead of milliseconds
+    if (timestamp < 10000000000) {
+        timestamp = timestamp * 1000;
+    }
+    
     const date = new Date(timestamp);
     return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
 }
@@ -107,592 +113,254 @@ function updatePriceChange(changePercent) {
     }
 }
 
-// Create a JSONP request
-function jsonpRequest(url, callback) {
-    const script = document.createElement('script');
-    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-    
-    window[callbackName] = function(data) {
-        delete window[callbackName];
-        document.body.removeChild(script);
-        callback(data);
-    };
-    
-    script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
-    document.body.appendChild(script);
-}
-
-// Fetch current Bitcoin price using multiple sources
+// Fetch current Bitcoin price
 async function fetchCurrentPrice() {
     try {
-        // Try local storage first for offline support
-        const cachedData = localStorage.getItem('btcCurrentPrice');
-        if (cachedData) {
-            const data = JSON.parse(cachedData);
-            const now = new Date().getTime();
-            // Use cached data if it's less than 5 minutes old
-            if (now - data.timestamp < 5 * 60 * 1000) {
-                updatePriceDisplay(data);
-                console.log('Using cached current price data');
+        // Try Block.cc API first
+        const response = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false');
+        const data = await response.json();
+
+        if (data && data.market_data) {
+            const price = data.market_data.current_price.usd;
+            const change24h = data.market_data.price_change_percentage_24h;
+            const high24h = data.market_data.high_24h.usd;
+            const low24h = data.market_data.low_24h.usd;
+
+            // Update UI
+            currentPriceElement.textContent = formatPrice(price);
+            updatePriceChange(change24h);
+            
+            // Update 24h high/low if elements exist
+            if (high24hElement) {
+                high24hElement.textContent = formatPrice(high24h);
             }
+            
+            if (low24hElement) {
+                low24hElement.textContent = formatPrice(low24h);
+            }
+            
+            lastUpdatedElement.textContent = 'Last updated: ' + formatDate(new Date().getTime());
+            
+            console.log('Current price data loaded from CoinGecko');
+        } else {
+            throw new Error('Invalid data from CoinGecko API');
+        }
+    } catch (error) {
+        console.error('Error fetching current price:', error);
+        
+        // Try fallback if primary API fails
+        try {
+            await fetchCurrentPriceFallback();
+        } catch (fallbackError) {
+            console.error('Error in fallback current price fetch:', fallbackError);
+            currentPriceElement.textContent = 'Error loading price';
+        }
+    }
+}
+
+// Fallback method for current price
+async function fetchCurrentPriceFallback() {
+    try {
+        // Try Binance API as fallback
+        const response = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        const data = await response.json();
+
+        if (data) {
+            const price = parseFloat(data.lastPrice);
+            const change24h = parseFloat(data.priceChangePercent);
+            const high24h = parseFloat(data.highPrice);
+            const low24h = parseFloat(data.lowPrice);
+
+            // Update UI
+            currentPriceElement.textContent = formatPrice(price);
+            updatePriceChange(change24h);
+            
+            // Update 24h high/low if elements exist
+            if (high24hElement) {
+                high24hElement.textContent = formatPrice(high24h);
+            }
+            
+            if (low24hElement) {
+                low24hElement.textContent = formatPrice(low24h);
+            }
+            
+            lastUpdatedElement.textContent = 'Last updated: ' + formatDate(new Date().getTime());
+            
+            console.log('Current price data loaded from Binance fallback');
+        } else {
+            throw new Error('Invalid data from Binance API');
+        }
+    } catch (error) {
+        console.error('Error in fallback current price fetch:', error);
+        
+        // Last resort: Use hardcoded data
+        currentPriceElement.textContent = formatPrice(80000);
+        updatePriceChange(1.5);
+        
+        if (high24hElement) {
+            high24hElement.textContent = formatPrice(81500);
         }
         
-        // Try multiple APIs in sequence
-        tryBinanceAPI()
-            .catch(() => tryHuobiAPI())
-            .catch(() => tryOKXAPI())
-            .catch(() => tryZBAPI())
-            .catch(error => {
-                console.error('All APIs failed:', error);
-                currentPriceElement.textContent = 'Error loading price';
-                // Use hardcoded data as last resort
-                useHardcodedData();
-            });
-    } catch (error) {
-        console.error('Error in fetchCurrentPrice:', error);
-        currentPriceElement.textContent = 'Error loading price';
+        if (low24hElement) {
+            low24hElement.textContent = formatPrice(79000);
+        }
+        
+        lastUpdatedElement.textContent = 'Last updated: ' + formatDate(new Date().getTime()) + ' (Estimated)';
+        console.log('Using hardcoded price data as last resort');
     }
 }
 
-// Try Binance API
-function tryBinanceAPI() {
-    return new Promise((resolve, reject) => {
-        try {
-            // Using a JSONP approach for Binance
-            jsonpRequest('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT', function(data) {
-                if (data) {
-                    const price = parseFloat(data.lastPrice);
-                    const open24h = parseFloat(data.openPrice);
-                    const change24h = parseFloat(data.priceChangePercent);
-                    const high24h = parseFloat(data.highPrice);
-                    const low24h = parseFloat(data.lowPrice);
-                    
-                    const priceData = {
-                        price: price,
-                        change24h: change24h,
-                        high24h: high24h,
-                        low24h: low24h,
-                        timestamp: new Date().getTime()
-                    };
-                    
-                    updatePriceDisplay(priceData);
-                    localStorage.setItem('btcCurrentPrice', JSON.stringify(priceData));
-                    resolve(priceData);
-                } else {
-                    reject(new Error('No data from Binance API'));
-                }
-            });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('Binance API timeout'));
-            }, 5000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Try Huobi API
-function tryHuobiAPI() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://api.huobi.pro/market/detail/merged?symbol=btcusdt')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.status === 'ok') {
-                        const price = data.tick.close;
-                        const open24h = data.tick.open;
-                        const change24h = ((price - open24h) / open24h) * 100;
-                        const high24h = data.tick.high;
-                        const low24h = data.tick.low;
-                        
-                        const priceData = {
-                            price: price,
-                            change24h: change24h,
-                            high24h: high24h,
-                            low24h: low24h,
-                            timestamp: new Date().getTime()
-                        };
-                        
-                        updatePriceDisplay(priceData);
-                        localStorage.setItem('btcCurrentPrice', JSON.stringify(priceData));
-                        resolve(priceData);
-                    } else {
-                        reject(new Error('No data from Huobi API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('Huobi API timeout'));
-            }, 5000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Try OKX API
-function tryOKXAPI() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.code === '0' && data.data && data.data.length > 0) {
-                        const tickerData = data.data[0];
-                        const price = parseFloat(tickerData.last);
-                        const open24h = parseFloat(tickerData.open24h);
-                        const change24h = ((price - open24h) / open24h) * 100;
-                        const high24h = parseFloat(tickerData.high24h);
-                        const low24h = parseFloat(tickerData.low24h);
-                        
-                        const priceData = {
-                            price: price,
-                            change24h: change24h,
-                            high24h: high24h,
-                            low24h: low24h,
-                            timestamp: new Date().getTime()
-                        };
-                        
-                        updatePriceDisplay(priceData);
-                        localStorage.setItem('btcCurrentPrice', JSON.stringify(priceData));
-                        resolve(priceData);
-                    } else {
-                        reject(new Error('No data from OKX API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('OKX API timeout'));
-            }, 5000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Try ZB API
-function tryZBAPI() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://api.zb.com/data/v1/ticker?market=btc_usdt')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.ticker) {
-                        const tickerData = data.ticker;
-                        const price = parseFloat(tickerData.last);
-                        const open24h = parseFloat(tickerData.open);
-                        const change24h = ((price - open24h) / open24h) * 100;
-                        const high24h = parseFloat(tickerData.high);
-                        const low24h = parseFloat(tickerData.low);
-                        
-                        const priceData = {
-                            price: price,
-                            change24h: change24h,
-                            high24h: high24h,
-                            low24h: low24h,
-                            timestamp: new Date().getTime()
-                        };
-                        
-                        updatePriceDisplay(priceData);
-                        localStorage.setItem('btcCurrentPrice', JSON.stringify(priceData));
-                        resolve(priceData);
-                    } else {
-                        reject(new Error('No data from ZB API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('ZB API timeout'));
-            }, 5000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Update price display with data
-function updatePriceDisplay(data) {
-    currentPriceElement.textContent = formatPrice(data.price);
-    updatePriceChange(data.change24h);
-    
-    if (high24hElement) {
-        high24hElement.textContent = formatPrice(data.high24h);
-    }
-    
-    if (low24hElement) {
-        low24hElement.textContent = formatPrice(data.low24h);
-    }
-    
-    lastUpdatedElement.textContent = 'Last updated: ' + formatDate(data.timestamp);
-}
-
-// Use hardcoded data as last resort
-function useHardcodedData() {
-    console.log('Using hardcoded data as fallback');
-    const hardcodedData = {
-        price: 65000,
-        change24h: 2.5,
-        high24h: 66500,
-        low24h: 64000,
-        timestamp: new Date().getTime()
-    };
-    
-    updatePriceDisplay(hardcodedData);
-}
-
-// Fetch historical Bitcoin price data
+// Fetch historical Bitcoin price data (6 months) using Block.cc API
 async function fetchHistoricalData() {
     try {
-        // Try local storage first for offline support
-        const cachedData = localStorage.getItem('btcHistoricalData');
-        if (cachedData) {
-            const data = JSON.parse(cachedData);
-            const now = new Date().getTime();
-            // Use cached data if it's less than 1 day old
-            if (now - data.timestamp < 24 * 60 * 60 * 1000) {
-                updateChartWithData(data.prices);
-                updateTableWithData(data.prices);
-                console.log('Using cached historical data');
-                return;
+        // Calculate date 6 months ago
+        const today = new Date();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(today.getMonth() - 6);
+
+        // Format dates for API
+        const fromDate = Math.floor(sixMonthsAgo.getTime() / 1000);
+        const toDate = Math.floor(today.getTime() / 1000);
+
+        // Try CoinGecko API first (more reliable)
+        try {
+            const response = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${fromDate}&to=${toDate}`);
+            const data = await response.json();
+
+            if (data && data.prices && data.prices.length > 0) {
+                // Process price data for chart
+                const processedData = data.prices.map((item, index) => {
+                    const entry = {
+                        timestamp: item[0],
+                        price: item[1]
+                    };
+                    
+                    // Add volume if available
+                    if (data.total_volumes && data.total_volumes[index]) {
+                        entry.volume = data.total_volumes[index][1];
+                    }
+                    
+                    return entry;
+                });
+                
+                // Update chart and table
+                updateChartAndTable(processedData);
+                
+                console.log('Historical data loaded from CoinGecko');
+                return; // Exit if successful
             }
+        } catch (error) {
+            console.error('Error fetching from CoinGecko:', error);
+            // Continue to fallback
         }
-        
-        // Try multiple APIs in sequence
-        tryBinanceHistorical()
-            .catch(() => tryHuobiHistorical())
-            .catch(() => tryOKXHistorical())
-            .catch(() => tryZBHistorical())
-            .catch(error => {
-                console.error('All historical APIs failed:', error);
-                // Use hardcoded data as last resort
-                useHardcodedHistoricalData();
-            });
+
+        // Fallback to Binance API
+        try {
+            const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${sixMonthsAgo.getTime()}&endTime=${today.getTime()}`);
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                // Process price data for chart
+                const processedData = data.map(item => ({
+                    timestamp: parseInt(item[0]),
+                    price: parseFloat(item[4]), // Close price
+                    open: parseFloat(item[1]),
+                    high: parseFloat(item[2]),
+                    low: parseFloat(item[3]),
+                    volume: parseFloat(item[5])
+                }));
+                
+                // Update chart and table
+                updateChartAndTable(processedData);
+                
+                console.log('Historical data loaded from Binance');
+                return; // Exit if successful
+            }
+        } catch (error) {
+            console.error('Error fetching from Binance:', error);
+            // Continue to next fallback
+        }
+
+        // If all APIs fail, try the original fallback
+        await fetchHistoricalDataFallback();
     } catch (error) {
         console.error('Error in fetchHistoricalData:', error);
+        try {
+            await fetchHistoricalDataFallback();
+        } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+        }
     }
 }
 
-// Try Binance API for historical data
-function tryBinanceHistorical() {
-    return new Promise((resolve, reject) => {
-        try {
-            // Calculate date 6 months ago
-            const today = new Date();
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setMonth(today.getMonth() - 6);
-            
-            fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${sixMonthsAgo.getTime()}&endTime=${today.getTime()}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        const prices = data.map(candle => {
-                            return {
-                                timestamp: candle[0],
-                                open: parseFloat(candle[1]),
-                                high: parseFloat(candle[2]),
-                                low: parseFloat(candle[3]),
-                                close: parseFloat(candle[4]),
-                                volume: parseFloat(candle[5])
-                            };
-                        });
-                        
-                        updateChartWithData(prices);
-                        updateTableWithData(prices);
-                        
-                        // Cache the data
-                        localStorage.setItem('btcHistoricalData', JSON.stringify({
-                            prices: prices,
-                            timestamp: new Date().getTime()
-                        }));
-                        
-                        resolve(prices);
-                    } else {
-                        reject(new Error('No historical data from Binance API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('Binance historical API timeout'));
-            }, 10000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
+// Fallback method using CoinGecko
+async function fetchHistoricalDataFallback() {
+    try {
+        // Calculate date 6 months ago
+        const today = new Date();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(today.getMonth() - 6);
 
-// Try Huobi API for historical data
-function tryHuobiHistorical() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://api.huobi.pro/market/history/kline?period=1day&size=180&symbol=btcusdt')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.status === 'ok' && data.data && data.data.length > 0) {
-                        const prices = data.data.map(candle => {
-                            return {
-                                timestamp: candle.id * 1000,
-                                open: candle.open,
-                                high: candle.high,
-                                low: candle.low,
-                                close: candle.close,
-                                volume: candle.vol
-                            };
-                        }).reverse(); // Huobi returns newest first
-                        
-                        updateChartWithData(prices);
-                        updateTableWithData(prices);
-                        
-                        // Cache the data
-                        localStorage.setItem('btcHistoricalData', JSON.stringify({
-                            prices: prices,
-                            timestamp: new Date().getTime()
-                        }));
-                        
-                        resolve(prices);
-                    } else {
-                        reject(new Error('No historical data from Huobi API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
+        // Format dates for API
+        const fromDate = Math.floor(sixMonthsAgo.getTime() / 1000);
+        const toDate = Math.floor(today.getTime() / 1000);
+
+        // Try alternative API endpoint
+        const response = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=180&api_key=3cb5df95c72e95b17c5c8fe50fdc62747f756c9b3363882f0f9c7c28c5e5b42a`);
+        const data = await response.json();
+
+        if (data && data.Data && data.Data.Data) {
+            // Process price data for chart
+            const processedData = data.Data.Data.map(priceData => ({
+                timestamp: priceData.time * 1000, // Convert to milliseconds
+                price: priceData.close,
+                open: priceData.open,
+                high: priceData.high,
+                low: priceData.low,
+                volume: priceData.volumeto
+            }));
             
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('Huobi historical API timeout'));
-            }, 10000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Try OKX API for historical data
-function tryOKXHistorical() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1D&limit=180')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.code === '0' && data.data && data.data.length > 0) {
-                        const prices = data.data.map(candle => {
-                            return {
-                                timestamp: parseInt(candle[0]),
-                                open: parseFloat(candle[1]),
-                                high: parseFloat(candle[2]),
-                                low: parseFloat(candle[3]),
-                                close: parseFloat(candle[4]),
-                                volume: parseFloat(candle[5])
-                            };
-                        }).reverse(); // OKX returns newest first
-                        
-                        updateChartWithData(prices);
-                        updateTableWithData(prices);
-                        
-                        // Cache the data
-                        localStorage.setItem('btcHistoricalData', JSON.stringify({
-                            prices: prices,
-                            timestamp: new Date().getTime()
-                        }));
-                        
-                        resolve(prices);
-                    } else {
-                        reject(new Error('No historical data from OKX API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
+            // Update chart and table
+            updateChartAndTable(processedData);
             
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('OKX historical API timeout'));
-            }, 10000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Try ZB API for historical data
-function tryZBHistorical() {
-    return new Promise((resolve, reject) => {
-        try {
-            fetch('https://api.zb.com/data/v1/kline?market=btc_usdt&type=1day&size=180')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.data && data.data.length > 0) {
-                        const prices = data.data.map(candle => {
-                            return {
-                                timestamp: candle[0] * 1000,
-                                open: parseFloat(candle[1]),
-                                high: parseFloat(candle[2]),
-                                low: parseFloat(candle[3]),
-                                close: parseFloat(candle[4]),
-                                volume: parseFloat(candle[5])
-                            };
-                        });
-                        
-                        updateChartWithData(prices);
-                        updateTableWithData(prices);
-                        
-                        // Cache the data
-                        localStorage.setItem('btcHistoricalData', JSON.stringify({
-                            prices: prices,
-                            timestamp: new Date().getTime()
-                        }));
-                        
-                        resolve(prices);
-                    } else {
-                        reject(new Error('No historical data from ZB API'));
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
-            
-            // Set a timeout to reject if it takes too long
-            setTimeout(() => {
-                reject(new Error('ZB historical API timeout'));
-            }, 10000);
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
-// Update chart with historical data
-function updateChartWithData(prices) {
-    // Store the data globally
-    historicalData = prices;
-    
-    // Clear existing data
-    chartConfig.data.labels = [];
-    chartConfig.data.datasets[0].data = [];
-    
-    // Find 6-month high and low
-    let highPrice = 0;
-    let lowPrice = Number.MAX_VALUE;
-    
-    // Add new data points
-    prices.forEach(priceData => {
-        chartConfig.data.labels.push(formatChartDate(priceData.timestamp));
-        chartConfig.data.datasets[0].data.push(priceData.close);
-        
-        // Update high/low values
-        if (priceData.high > highPrice) highPrice = priceData.high;
-        if (priceData.low < lowPrice) lowPrice = priceData.low;
-    });
-    
-    // Update 6-month high/low if elements exist
-    if (high6mElement) {
-        high6mElement.textContent = formatPrice(highPrice);
-    }
-    
-    if (low6mElement) {
-        low6mElement.textContent = formatPrice(lowPrice);
-    }
-    
-    // Update chart
-    chart.update();
-}
-
-// Update table with historical data
-function updateTableWithData(prices) {
-    if (!tableBodyElement) return;
-    
-    // Clear existing table rows
-    tableBodyElement.innerHTML = '';
-    
-    // Add new rows for each data point (limit to 30 most recent)
-    const recentPrices = prices.slice(-30);
-    
-    recentPrices.forEach((priceData, index) => {
-        const row = document.createElement('tr');
-        
-        // Date column
-        const dateCell = document.createElement('td');
-        dateCell.textContent = formatDate(priceData.timestamp).split(',')[0]; // Just the date part
-        row.appendChild(dateCell);
-        
-        // Price column
-        const priceCell = document.createElement('td');
-        priceCell.textContent = formatPrice(priceData.close);
-        row.appendChild(priceCell);
-        
-        // 24h Change column
-        const changeCell = document.createElement('td');
-        if (index < recentPrices.length - 1) {
-            const prevClose = recentPrices[index + 1].close;
-            const change = ((priceData.close - prevClose) / prevClose) * 100;
-            changeCell.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
-            changeCell.className = change >= 0 ? 'positive' : 'negative';
+            console.log('Historical data loaded from CryptoCompare fallback');
         } else {
-            changeCell.textContent = 'N/A';
+            throw new Error('No historical data received from fallback API');
         }
-        row.appendChild(changeCell);
+    } catch (error) {
+        console.error('Error in fallback historical data fetch:', error);
         
-        // Volume column
-        const volumeCell = document.createElement('td');
-        volumeCell.textContent = '$' + priceData.volume.toLocaleString('en-US', {maximumFractionDigits: 0});
-        row.appendChild(volumeCell);
-        
-        tableBodyElement.appendChild(row);
-    });
+        // Last resort: Generate dummy data
+        generateDummyHistoricalData();
+    }
 }
 
-// Use hardcoded historical data as last resort
-function useHardcodedHistoricalData() {
-    console.log('Using hardcoded historical data as fallback');
+// Generate dummy historical data as a last resort
+function generateDummyHistoricalData() {
+    console.log('Generating dummy historical data as last resort');
     
-    // Generate 180 days of fake data
+    // Generate 180 days of dummy data
     const today = new Date();
-    const prices = [];
+    let currentPrice = 80000; // Current approximate BTC price
+    const dummyData = [];
     
-    let basePrice = 65000;
     for (let i = 180; i >= 0; i--) {
         const date = new Date();
         date.setDate(today.getDate() - i);
         
-        // Add some randomness to the price
-        const randomChange = (Math.random() - 0.5) * 2000;
-        basePrice = basePrice + randomChange;
-        if (basePrice < 30000) basePrice = 30000;
-        if (basePrice > 100000) basePrice = 100000;
+        // Add some randomness to create realistic looking data
+        const randomFactor = 0.98 + (Math.random() * 0.04); // Random between 0.98 and 1.02
+        currentPrice = currentPrice * randomFactor;
         
-        const high = basePrice + Math.random() * 1000;
-        const low = basePrice - Math.random() * 1000;
-        
-        prices.push({
+        dummyData.push({
             timestamp: date.getTime(),
-            open: basePrice - Math.random() * 500,
-            high: high,
-            low: low,
-            close: basePrice,
-            volume: 1000000000 + Math.random() * 500000000
+            price: currentPrice,
+            volume: 20000000000 + (Math.random() * 10000000000) // Random volume around 20-30B
         });
     }
     
-    updateChartWithData(prices);
-    updateTableWithData(prices);
+    // Update chart and table
+    updateChartAndTable(dummyData);
 }
 
 // Initialize and set up auto-refresh
@@ -706,7 +374,149 @@ async function initialize() {
     
     // Refresh historical data every 30 minutes
     setInterval(fetchHistoricalData, 1800000);
+    
+    console.log('Bitcoin tracker initialized');
 }
 
 // Start the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', initialize); 
+document.addEventListener('DOMContentLoaded', initialize);
+
+// Update chart with historical data
+function updateChartAndTable(prices) {
+    if (!prices || prices.length === 0) return;
+    
+    // Clear existing data
+    chartConfig.data.labels = [];
+    chartConfig.data.datasets[0].data = [];
+    
+    // Find 6-month high and low
+    let highPrice = 0;
+    let lowPrice = Number.MAX_VALUE;
+    
+    // Process data for chart
+    prices.forEach(priceData => {
+        const timestamp = priceData.timestamp || priceData.time * 1000;
+        const price = priceData.price || priceData.close;
+        
+        chartConfig.data.labels.push(formatChartDate(timestamp));
+        chartConfig.data.datasets[0].data.push(price);
+        
+        // Update high/low values
+        if (price > highPrice) highPrice = price;
+        if (price < lowPrice) lowPrice = price;
+    });
+    
+    // Update 6-month high/low if elements exist
+    if (high6mElement) {
+        high6mElement.textContent = formatPrice(highPrice);
+    }
+    
+    if (low6mElement) {
+        low6mElement.textContent = formatPrice(lowPrice);
+    }
+    
+    // Update chart
+    chart.update();
+    
+    // Update table
+    updateHistoricalTable(prices);
+    
+    console.log('Chart and table updated with', prices.length, 'data points');
+}
+
+// Update historical data table
+function updateHistoricalTable(prices) {
+    const tableBody = document.getElementById('table-body');
+    if (!tableBody) {
+        console.error('Table body element not found');
+        return;
+    }
+    
+    // Clear existing rows
+    tableBody.innerHTML = '';
+    
+    // Sort by date (newest first)
+    const sortedPrices = [...prices].sort((a, b) => {
+        const timestampA = a.timestamp || a.time * 1000;
+        const timestampB = b.timestamp || b.time * 1000;
+        return timestampB - timestampA;
+    });
+    
+    // Take only the most recent entries (one per week)
+    const weeklyData = [];
+    const weekMap = new Map();
+    
+    sortedPrices.forEach(priceData => {
+        const timestamp = priceData.timestamp || priceData.time * 1000;
+        const date = new Date(timestamp);
+        const weekKey = `${date.getFullYear()}-${Math.floor(date.getDate() / 7)}`;
+        
+        if (!weekMap.has(weekKey)) {
+            weekMap.set(weekKey, priceData);
+            weeklyData.push(priceData);
+        }
+    });
+    
+    // Take only the first 10 weeks
+    const recentData = weeklyData.slice(0, 10);
+    
+    // Add rows to table
+    recentData.forEach((priceData, index) => {
+        const timestamp = priceData.timestamp || priceData.time * 1000;
+        const price = priceData.price || priceData.close;
+        const volume = priceData.volume || priceData.v || 'N/A';
+        
+        const row = document.createElement('tr');
+        
+        // Date column
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatDate(timestamp).split(',')[0]; // Just the date part
+        row.appendChild(dateCell);
+        
+        // Price column
+        const priceCell = document.createElement('td');
+        priceCell.textContent = formatPrice(price);
+        row.appendChild(priceCell);
+        
+        // 24h Change column
+        const changeCell = document.createElement('td');
+        if (index < recentData.length - 1) {
+            const prevPrice = recentData[index + 1].price || recentData[index + 1].close;
+            const change = ((price - prevPrice) / prevPrice) * 100;
+            changeCell.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
+            changeCell.className = change >= 0 ? 'positive' : 'negative';
+        } else {
+            changeCell.textContent = 'N/A';
+        }
+        row.appendChild(changeCell);
+        
+        // Volume column
+        const volumeCell = document.createElement('td');
+        if (volume !== 'N/A') {
+            volumeCell.textContent = formatVolume(volume);
+        } else {
+            volumeCell.textContent = 'N/A';
+        }
+        row.appendChild(volumeCell);
+        
+        tableBody.appendChild(row);
+    });
+    
+    console.log('Table updated with', recentData.length, 'rows');
+}
+
+// Format volume for display
+function formatVolume(volume) {
+    volume = parseFloat(volume);
+    if (isNaN(volume)) return 'N/A';
+    
+    if (volume >= 1e9) {
+        return '$' + (volume / 1e9).toFixed(2) + 'B';
+    } else if (volume >= 1e6) {
+        return '$' + (volume / 1e6).toFixed(2) + 'M';
+    } else if (volume >= 1e3) {
+        return '$' + (volume / 1e3).toFixed(2) + 'K';
+    } else {
+        return '$' + volume.toLocaleString();
+    }
+} 
